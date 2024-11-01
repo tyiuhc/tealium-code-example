@@ -1,0 +1,91 @@
+<script>
+  window.experimentIntegration = {
+    name: 'Tealium plugin',
+    type: 'integration',
+    setup: function(config, client) {
+      return new Promise( (resolve, reject) => {
+                // Check if Tealium is already loaded
+                if (typeof utag !== "undefined" && utag !== null) {
+                  resolve("Tealium is ready");
+                } else {
+                  // If not, wait for Tealium's ready event using utag.handler.iflag
+                  if (typeof utag !== "undefined" && utag.handler && utag.handler.iflag) {
+                    utag.handler.iflag.push( () => {
+                              resolve("Tealium is fully ready");
+                            }
+                    );
+                  } else {
+                    // Fallback to periodically check if Tealium is loaded
+                    let intervalId = setInterval( () => {
+                              if (typeof utag !== "undefined" && utag !== null) {
+                                clearInterval(intervalId);
+                                resolve("Tealium is now ready");
+                              }
+                            }
+                            , 100);
+                    // Check every 100ms
+
+                    // Optionally, add a timeout to reject the promise if utag never loads
+                    setTimeout( () => {
+                              clearInterval(intervalId);
+                              reject("Timeout: Tealium failed to load.");
+                            }
+                            , 10000);
+                    // 10 seconds timeout
+                  }
+                }
+              }
+      );
+    },
+
+    getUser: function() {
+      // this adds additional properties to the user object
+      return {};
+    },
+    track: function(e) {
+      console.log("Event Type:", e.eventType);
+      console.log("Event Properties:", e.eventProperties);
+      const flagKey = e.eventProperties.flag_key || "unknown_flag_key";
+      const experimentKey = e.eventProperties.experiment_key || "unknown_experiment_key";
+      const variant = e.eventProperties.variant || "unknown_variant";
+      const metadata = e.eventProperties.metadata || {};
+      const applicationType = (teal.data.last_b_object && teal.data.last_b_object.application_type) || "default_application_type";
+      console.log("Flag Key:", flagKey);
+      console.log("Experiment Key:", experimentKey);
+      console.log("Variant:", variant);
+      console.log("Metadata:", metadata);
+      var dataObj = {
+        "application_type": applicationType,
+        "event_category": applicationType,
+        "event_action": e.eventType || "unknown_event_action",
+        "page_location": location.pathname,
+        "tealium_event": "experiment_" + flagKey + "_" + variant + "_shown",
+        "event_label": "experiment " + flagKey + " " + variant + " shown",
+        "experiment_key": experimentKey,
+        "experiment_flag_key": flagKey,
+        "experiment_variant": variant
+      };
+      teal.utils.when(function() {
+        return window.utag && window.utag.link;
+      }, function() {
+        try {
+          utag.link(dataObj);
+          console.log("Tealium event sent:", dataObj);
+        } catch (error) {
+          console.error("Failed to send Tealium event:", error);
+        }
+      });
+      teal.utils.when(function() {
+        return window.amplitude && amplitude.getInstance() && amplitude.getInstance()._instanceName;
+      }, function() {
+        try {
+          amplitude.getInstance().logEvent('$exposure', e.eventProperties);
+          console.log("Amplitude event logged:", e.eventProperties);
+        } catch (error) {
+          console.error("Failed to log Amplitude event:", error);
+        }
+      });
+      return true;
+    },
+  };
+</script>
