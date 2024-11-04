@@ -79,7 +79,7 @@
         return window.amplitude && amplitude.getInstance() && amplitude.getInstance()._instanceName;
       }, function() {
         try {
-          amplitude.getInstance().logEvent('$exposure', e.eventProperties);
+          amplitude.getInstance().logEvent(e.eventType, e.eventProperties);
           console.log("Amplitude event logged:", e.eventProperties);
         } catch (error) {
           console.error("Failed to log Amplitude event:", error);
